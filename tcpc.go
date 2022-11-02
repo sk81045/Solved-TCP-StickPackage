@@ -12,9 +12,11 @@ import (
 
 var (
 	ConnectStatus = false
+	goStatus      = false
 )
 
-func read(conn net.Conn) {
+func read(conn net.Conn, stop <-chan int) {
+	goStatus = true
 	fmt.Printf("exec")
 	defer conn.Close()
 	for {
@@ -23,14 +25,21 @@ func read(conn net.Conn) {
 		if err != nil {
 			ConnectStatus = false
 			// connect()
+			conn.Close()
 			fmt.Println("Read from tcp server failed,err:", err)
-			break
+			select {
+			case <-stop:
+				fmt.Println("stop!")
+				return
+			}
+			// break
 		}
 		data := string(buf[:n])
 		if data == "ping..." {
 			W(conn, "Received ping...")
 		}
 		fmt.Printf("Recived from serve,data:%s\n", data)
+
 	}
 }
 
@@ -41,19 +50,22 @@ func W(conn net.Conn, msg string) bool {
 		return false
 	}
 
-	for i := 0; i < 10; i++ {
-		_, err = conn.Write(data)
-		if err != nil {
-			fmt.Println("Server Write failed,err:", err)
-			return false
-		}
+	// for i := 0; i < 10; i++ {
+	_, err = conn.Write(data)
+	if err != nil {
+		fmt.Println("写入错误:", err)
+		// stop <- 3
+		return false
 	}
+
+	// }
 
 	return true
 }
 
 func write(conn net.Conn) {
 	fmt.Printf("write")
+	goStatus = true
 	defer conn.Close()
 	inputReader := bufio.NewReader(os.Stdin)
 	// 一直读取直到遇到换行符
@@ -75,6 +87,7 @@ func write(conn net.Conn) {
 }
 
 func connect() {
+	stop := make(chan int)
 	for {
 		time.Sleep(time.Second * 3)
 		if ConnectStatus == false {
@@ -82,15 +95,19 @@ func connect() {
 			// 连接服务器
 			conn, err := net.Dial("tcp", "127.0.0.1:10087")
 			if err != nil {
+				stop <- 3
 				fmt.Println("Connect to TCP server failed ,err:", err)
 				continue
 			} else {
 				fmt.Println("Connect Succuses")
 				ConnectStatus = true
-				go read(conn)
-				go write(conn)
+				if goStatus == false {
+					fmt.Println("first run go")
+					go read(conn, stop)
+					go write(conn)
+				}
+				// continue
 			}
-
 		}
 	}
 }
