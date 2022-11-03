@@ -38,7 +38,6 @@ func Decode(reader *bufio.Reader) (string, error) {
 	if int32(reader.Buffered()) < length+4 {
 		return "", err
 	}
-
 	// 读取真正的消息数据
 	pack := make([]byte, int(4+length))
 	_, err = reader.Read(pack)
