@@ -1,17 +1,15 @@
 package main
 
 import (
-	"bufio"
-	"cron-test/tcp/proto"
+	"cron-test/proto"
+	"encoding/json"
 	"log"
 	"net"
-	"os"
-	"strings"
 	"time"
 )
 
 var (
-	R = false //连接状态
+	stop = make(chan string)
 )
 
 // ClientManager 客户端管理
@@ -50,37 +48,23 @@ func (manager *ClientManager) start() {
 			manager.clients[conn] = true
 		case conn := <-manager.unregister: //断开连接时
 			log.Println("断开连接", conn)
-			// if _, ok := manager.clients[conn]; ok {
-			// 	close(conn.send)
-			// 	delete(manager.clients, conn)
-			// }
-			R = false
-			log.Println("RR", R)
+			stop <- "i"
 			manager.MomentConn("10087")
 			return
-			// case message := <-manager.broadcast: //收到服务端消息 开始广播
 		}
 	}
 }
 
 func (manager *ClientManager) MomentConn(port string) {
-	log.Println("Beginning Connect..")
 	if port == "" {
 		port = "10087"
 	}
-	// for {
-	// time.Sleep(time.Second * 2)
-
-	log.Println("port", port)
-
 	conn, err := net.Dial("tcp", "127.0.0.1:"+port)
 	if err != nil {
-		log.Println("连接失败 再次尝试,err:", err)
+		log.Println("Repeat Connect,err:", err)
 		time.Sleep(time.Second * 2)
 		manager.MomentConn("10087")
-		// continue
 	} else {
-		R = true
 		client := &Client{
 			conn: conn,
 			send: make(chan []byte),
@@ -89,10 +73,8 @@ func (manager *ClientManager) MomentConn(port string) {
 		manager.register <- client
 		log.Println("Connect Succuses...")
 		go client.Read()
-		go client.Write()
-
-		// continue
-		// }
+		go client.Ping()
+		go client.Register()
 	}
 }
 
@@ -106,45 +88,74 @@ func (c *Client) Read() {
 		if err != nil {
 			conn.Close()
 			manager.unregister <- c
-			// time.Sleep(time.Second * 1)
 			log.Println("检测到服务端断开,err:", err)
 			return
 		}
 		data := string(buf[:n])
-		if data == "ping..." {
-			// W(conn, "Received ping...")
-		}
+		// if data == "ping..." {
+		// 	// W(conn, "Received ping...")
+		// }
 		log.Printf("Recived from serve,data:%s\n", data)
 	}
 }
 
-func (c *Client) Write() {
+type Message struct {
+	Type     int
+	Describe string
+	Content  string
+	Pid      int
+	Sid      int
+}
+
+func (c *Client) Register() {
 	defer c.conn.Close()
-
-	inputReader := bufio.NewReader(os.Stdin)
-	// 一直读取直到遇到换行符
+	item := &Message{
+		Type:     2,
+		Describe: "register",
+		Content:  "Succuses",
+		Pid:      1045,
+		Sid:      888,
+	}
+	msg, err := json.Marshal(item)
+	if err != nil {
+		panic(err)
+	}
 	for {
-
-		if R == true {
-			log.Println("Write 停止!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-			return
-		}
-		log.Println("Write....", R)
-		input, err := inputReader.ReadString('\n')
-		// log.Println("input", input)
-
-		if err != nil {
-			log.Println("Read from console failed,err:", err)
-			return
-		}
-
-		// 读取到字符"Q"退出
-		str := strings.TrimSpace(input)
-		if str == "Q" {
+		time.Sleep(2 * time.Second)
+		d := W(c.conn, string(msg))
+		if d != true {
+			log.Println("ping over:", c.conn)
 			break
 		}
+		select {}
+	}
+}
 
-		W(c.conn, input)
+func (c *Client) Ping() {
+	defer c.conn.Close()
+	item := &Message{
+		Type:     1,
+		Describe: "ping",
+		Content:  "Succuses",
+		Pid:      2698,
+		Sid:      888,
+	}
+	msg, err := json.Marshal(item)
+	if err != nil {
+		panic(err)
+	}
+	for {
+		time.Sleep(2 * time.Second)
+		d := W(c.conn, string(msg))
+		if d != true {
+			log.Println("ping over:", c.conn)
+			break
+		}
+	}
+	select {
+	case <-stop:
+		log.Println("ping stop:")
+		return
 	}
 }
 
@@ -154,15 +165,10 @@ func W(conn net.Conn, msg string) bool {
 		log.Println("encode msg failed, err:", err)
 		return false
 	}
-	// for i := 0; i < 10; i++ {
 	_, err = conn.Write(data)
 	if err != nil {
 		log.Println("写入错误:", err)
-		// stop <- 3
 		return false
 	}
-
-	// }
-
 	return true
 }
