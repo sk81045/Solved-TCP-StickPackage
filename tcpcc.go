@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"cron-test/tcp/proto"
+	"cron-test/proto"
 	"log"
 	"net"
 	"os"
@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	R = false //连接状态
+	R      = false //连接状态
+	wirteC = make(chan string, 2)
 )
 
 // ClientManager 客户端管理
@@ -54,8 +55,7 @@ func (manager *ClientManager) start() {
 			// 	close(conn.send)
 			// 	delete(manager.clients, conn)
 			// }
-			R = false
-			log.Println("RR", R)
+			wirteC <- "exit" // 入 chan
 			manager.MomentConn("10087")
 			return
 			// case message := <-manager.broadcast: //收到服务端消息 开始广播
@@ -89,7 +89,7 @@ func (manager *ClientManager) MomentConn(port string) {
 		manager.register <- client
 		log.Println("Connect Succuses...")
 		go client.Read()
-		go client.Write()
+		go client.Ping()
 
 		// continue
 		// }
@@ -120,18 +120,12 @@ func (c *Client) Read() {
 
 func (c *Client) Write() {
 	defer c.conn.Close()
-
 	inputReader := bufio.NewReader(os.Stdin)
 	// 一直读取直到遇到换行符
 	for {
-
-		if R == true {
-			log.Println("Write 停止!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-			return
-		}
 		log.Println("Write....", R)
 		input, err := inputReader.ReadString('\n')
-		// log.Println("input", input)
+		log.Println("input", input)
 
 		if err != nil {
 			log.Println("Read from console failed,err:", err)
@@ -143,8 +137,14 @@ func (c *Client) Write() {
 		if str == "Q" {
 			break
 		}
-
 		W(c.conn, input)
+		// select {
+		// //如果有新的连接接入,就通过channel把连接传递给conn
+		// case <-wirteC:
+		// 	log.Println("Write 停止!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		// 	break
+		// }
+		log.Println("blocking！！")
 	}
 }
 
@@ -165,4 +165,22 @@ func W(conn net.Conn, msg string) bool {
 	// }
 
 	return true
+}
+
+func (c *Client) Ping() {
+	for {
+		time.Sleep(1 * time.Second)
+		msg := "ping..."
+		d := W(c.conn, msg)
+		if d != true {
+			log.Println("ping over:", c.conn)
+			break
+		}
+		// select {
+		// //如果有新的连接接入,就通过channel把连接传递给conn
+		// case <-wirteC:
+		// 	log.Println("Write 停止!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		// 	break
+		// }
+	}
 }

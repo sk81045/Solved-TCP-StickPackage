@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"cron-test/tcp/proto"
+	"cron-test/proto"
 	"fmt"
 	"io"
 	"net"
