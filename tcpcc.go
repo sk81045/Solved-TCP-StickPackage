@@ -49,7 +49,7 @@ func (manager *ClientManager) start() {
 		case conn := <-manager.unregister: //断开连接时
 			log.Println("断开连接", conn)
 			stop <- "i"
-			manager.MomentConn("10087")
+			manager.MomentConn("10086")
 			return
 		}
 	}
@@ -57,13 +57,13 @@ func (manager *ClientManager) start() {
 
 func (manager *ClientManager) MomentConn(port string) {
 	if port == "" {
-		port = "10087"
+		port = "10086"
 	}
-	conn, err := net.Dial("tcp", "127.0.0.1:"+port)
+	conn, err := net.Dial("tcp", "152.136.25.223:"+port)
 	if err != nil {
 		log.Println("Repeat Connect,err:", err)
 		time.Sleep(time.Second * 2)
-		manager.MomentConn("10087")
+		manager.MomentConn("10086")
 	} else {
 		client := &Client{
 			conn: conn,
@@ -171,16 +171,4 @@ func W(conn net.Conn, msg string) bool {
 		return false
 	}
 	return true
-}
-
-func (c *Client) Ping() {
-	for {
-		time.Sleep(1 * time.Second)
-		msg := "ping..."
-		d := W(c.conn, msg)
-		if d != true {
-			log.Println("ping over:", c.conn)
-			break
-		}
-	}
 }
