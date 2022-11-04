@@ -14,10 +14,10 @@ var (
 
 // ClientManager 客户端管理
 type ClientManager struct {
-	clients    map[*Client]bool //客户端 map 储存并管理所有的长连接client，在线的为true，不在的为false
-	broadcast  chan []byte      //web端发送来的的message我们用broadcast来接收，并最后分发给所有的client
-	register   chan *Client     //新创建的长连接client
-	unregister chan *Client     //新注销的长连接client
+	clients    map[*Client]bool
+	broadcast  chan []byte
+	register   chan *Client
+	unregister chan *Client
 }
 
 type Client struct {
@@ -25,7 +25,6 @@ type Client struct {
 	send chan []byte
 }
 
-//创建客户端管理者
 var manager = ClientManager{
 	broadcast:  make(chan []byte),
 	register:   make(chan *Client),
@@ -34,7 +33,7 @@ var manager = ClientManager{
 }
 
 func main() {
-	manager.MomentConn("10087")
+	manager.MomentConn("")
 	for {
 
 	}
@@ -46,10 +45,10 @@ func (manager *ClientManager) start() {
 		case conn := <-manager.register: //如果有新的连接接入,就通过channel把连接传递给conn
 			log.Println("Create Silce", conn)
 			manager.clients[conn] = true
-		case conn := <-manager.unregister: //断开连接时
-			log.Println("断开连接", conn)
+		case <-manager.unregister: //断开连接时
+			log.Println("trying repeat connect")
 			stop <- "i"
-			manager.MomentConn("10086")
+			manager.MomentConn("")
 			return
 		}
 	}
@@ -57,13 +56,13 @@ func (manager *ClientManager) start() {
 
 func (manager *ClientManager) MomentConn(port string) {
 	if port == "" {
-		port = "10086"
+		port = "10087"
 	}
-	conn, err := net.Dial("tcp", "152.136.25.223:"+port)
+	conn, err := net.Dial("tcp", "127.0.0.1:"+port)
 	if err != nil {
 		log.Println("Repeat Connect,err:", err)
 		time.Sleep(time.Second * 2)
-		manager.MomentConn("10086")
+		manager.MomentConn("")
 	} else {
 		client := &Client{
 			conn: conn,
@@ -88,13 +87,10 @@ func (c *Client) Read() {
 		if err != nil {
 			conn.Close()
 			manager.unregister <- c
-			log.Println("检测到服务端断开,err:", err)
+			log.Println("serve break,err:", err)
 			return
 		}
 		data := string(buf[:n])
-		// if data == "ping..." {
-		// 	// W(conn, "Received ping...")
-		// }
 		log.Printf("Recived from serve,data:%s\n", data)
 	}
 }

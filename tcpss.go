@@ -53,7 +53,6 @@ func (manager *ClientManager) start() {
 }
 
 func main() {
-	// 监听TCP 服务端口
 	listener, err := net.Listen("tcp", "0.0.0.0:10087")
 	if err != nil {
 		fmt.Println("Listen tcp server failed,err:", err)
@@ -61,7 +60,6 @@ func main() {
 	}
 
 	for {
-		// 建立socket连接
 		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Println("Listen.Accept failed,err:", err)
@@ -110,7 +108,6 @@ func (c *Client) Read() {
 		if Msg.Type == 2 {
 			c.id = Msg.Pid
 			go c.Operations(c.id)
-			// fmt.Println("c.id ", c.id)
 		}
 	}
 }
@@ -130,9 +127,7 @@ func (c *Client) Write() {
 	defer c.conn.Close()
 	for {
 		select {
-		//从send里读消息
 		case message, ok := <-c.send:
-			//如果没有消息
 			if !ok {
 				c.conn.Write([]byte{})
 				return
